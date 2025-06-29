@@ -1,15 +1,35 @@
-transformers
-torch
-sentence-transformers
-numpy
-scikit-learn
-accelerate
-setuptools
-python-dotenv
-google-generativeai
-rapidfuzz
-PyPDF2
-fastapi
-uvicorn
-python-multipart
-pydantic
+# Core ML libraries (CPU-only versions to reduce size)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.1.0
+torchvision>=0.16.0
+torchaudio>=2.1.0
+
+# NLP and embedding libraries
+transformers>=4.35.0
+sentence-transformers>=2.2.0
+scikit-learn>=1.3.0
+accelerate>=0.24.0
+
+# Web framework and utilities
+fastapi>=0.104.0
+uvicorn>=0.24.0
+python-multipart>=0.0.6
+pydantic>=2.5.0
+pydantic[email]>=2.5.0
+email-validator>=2.0.0
+
+# Database
+sqlalchemy>=2.0.23
+psycopg2-binary>=2.9.9
+alembic>=1.12.1
+
+# Authentication
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# Utilities
+python-dotenv>=1.0.0
+google-generativeai>=0.3.0
+rapidfuzz>=3.5.0
+PyPDF2>=3.0.0
+numpy>=1.26.0

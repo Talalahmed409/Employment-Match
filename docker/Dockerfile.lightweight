@@ -1,0 +1,50 @@
+# Lightweight development Dockerfile
+FROM python:3.9-slim
+
+# Install minimal runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Set the working directory
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies (excluding heavy ML libraries for dev)
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir \
+    fastapi>=0.104.0 \
+    uvicorn>=0.24.0 \
+    python-multipart>=0.0.6 \
+    pydantic>=2.5.0 \
+    pydantic[email]>=2.5.0 \
+    email-validator>=2.0.0 \
+    sqlalchemy>=2.0.23 \
+    psycopg2-binary>=2.9.9 \
+    alembic>=1.12.1 \
+    python-jose[cryptography]>=3.3.0 \
+    passlib[bcrypt]>=1.7.4 \
+    python-dotenv>=1.0.0 \
+    google-generativeai>=0.3.0 \
+    rapidfuzz>=3.5.0 \
+    PyPDF2>=3.0.0 \
+    numpy>=1.26.0
+
+# Copy application code
+COPY . .
+
+# Create data directory
+RUN mkdir -p data
+
+# Expose port
+EXPOSE 8080
+
+# Set environment variables
+ENV PORT=8080
+ENV PYTHONUNBUFFERED=1
+
+# Start the API server
+CMD ["uvicorn", "employment_match.API:app", "--host", "0.0.0.0", "--port", "8080", "--reload"] 

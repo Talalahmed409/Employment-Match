@@ -1,0 +1,85 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Test files
+test_*.py
+*_test.py
+
+# Local development
+.env
+.env.local
+.env.*.local
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Uploads (will be created at runtime)
+uploads/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Large data files (if you want to exclude them)
+# data/skills_en.csv
+# data/esco_skills.json
+# data/esco_embeddings.npy
+
+# Database
+*.db
+*.sqlite3
+
+# Environment variables
+*.env
+.env.*
+
+# Node modules
+node_modules/
+
+# Data files
+data/*.csv 
