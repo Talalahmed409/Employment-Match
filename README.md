@@ -2,7 +2,7 @@
 
 A comprehensive job application platform that combines AI-powered skill extraction with a full job posting and application management system. The platform extracts technical and soft skills from job descriptions and CVs, standardizes them against the ESCO taxonomy (v1.2.0), and provides intelligent skill matching for job applications.
 
-## Overview
+## 🚀 Overview
 
 This project has evolved from a skill extraction tool into a complete job application system with the following capabilities:
 
@@ -11,8 +11,9 @@ This project has evolved from a skill extraction tool into a complete job applic
 - **Skill Matching**: AI-powered matching between candidate skills and job requirements
 - **Application Tracking**: Complete application lifecycle management
 - **User Authentication**: Secure JWT-based authentication for companies and candidates
+- **Docker Support**: Easy deployment with Docker and Docker Compose
 
-## Key Features
+## ✨ Key Features
 
 ### For Companies
 
@@ -40,22 +41,50 @@ This project has evolved from a skill extraction tool into a complete job applic
 - PostgreSQL database with SQLAlchemy ORM
 - JWT-based authentication
 - RESTful API with FastAPI
+- Docker containerization for easy deployment
 
-## Quick Start
+## 🛠️ Quick Start
 
 ### Prerequisites
 
-- Python 3.8+
-- PostgreSQL 12+
+- Python 3.8+ (for local development)
+- PostgreSQL 12+ (for local development)
+- Docker & Docker Compose (for containerized deployment)
 - Google Gemini API Key (optional, for enhanced skill extraction)
 
-### Installation
+### Option 1: Docker Deployment (Recommended)
+
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/Talalahmed409/Employment-Match.git
+   cd Employment-Match
+   ```
+
+2. **Configure environment variables**
+
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+
+3. **Start with Docker Compose**
+
+   ```bash
+   docker-compose up -d
+   ```
+
+4. **Access the application**
+   - API Documentation: http://localhost:8080/docs
+   - Health Check: http://localhost:8080/health
+
+### Option 2: Local Development
 
 1. **Clone and setup**
 
    ```bash
-   git clone https://github.com/MahmoudSalama7/Employment_Match.git
-   cd Employment_Match
+   git clone https://github.com/Talalahmed409/Employment-Match.git
+   cd Employment-Match
    pip install -r requirements.txt
    ```
 
@@ -87,14 +116,54 @@ This project has evolved from a skill extraction tool into a complete job applic
 5. **Start the application**
 
    ```bash
-   python API.py
+   python start_server.py
    ```
 
 6. **Access the API**
    - API Documentation: http://localhost:8080/docs
    - Health Check: http://localhost:8080/health
 
-## API Endpoints
+## 🐳 Docker Deployment
+
+### Using Docker Compose
+
+The easiest way to deploy the application is using Docker Compose:
+
+```bash
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+### Manual Docker Build
+
+```bash
+# Build the image
+docker build -t employment-match .
+
+# Run the container
+docker run -p 8080:8080 \
+  -e DATABASE_URL="your_database_url" \
+  -e SECRET_KEY="your_secret_key" \
+  employment-match
+```
+
+### Production Deployment
+
+For production deployment, see [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for detailed instructions including:
+
+- Google Cloud Platform deployment
+- Environment variable configuration
+- Database setup
+- SSL/TLS configuration
+- Monitoring and logging
+
+## 📚 API Endpoints
 
 ### Authentication
 
@@ -126,7 +195,9 @@ This project has evolved from a skill extraction tool into a complete job applic
 - `POST /extract-cv-skills-text` - Extract skills from CV text
 - `POST /match-skills` - Match CV skills against job skills
 
-## Database Schema
+For detailed API documentation, visit `/docs` when the server is running.
+
+## 🗄️ Database Schema
 
 The system uses PostgreSQL with the following main tables:
 
@@ -136,9 +207,9 @@ The system uses PostgreSQL with the following main tables:
 - **applications**: Job applications
 - **skill_matches**: Skill matching results with scores
 
-See [DATABASE_GUIDE.md](DATABASE_GUIDE.md) for detailed schema information.
+See [docs/DATABASE_GUIDE.md](docs/DATABASE_GUIDE.md) for detailed schema information.
 
-## Workflow Example
+## 🔄 Workflow Example
 
 1. **Company Registration**
 
@@ -188,7 +259,7 @@ See [DATABASE_GUIDE.md](DATABASE_GUIDE.md) for detailed schema information.
      -H "Authorization: Bearer COMPANY_TOKEN"
    ```
 
-## Configuration
+## ⚙️ Configuration
 
 ### Environment Variables
 
@@ -204,49 +275,74 @@ See [DATABASE_GUIDE.md](DATABASE_GUIDE.md) for detailed schema information.
 - `FUZZY_THRESHOLD`: Fuzzy matching threshold (default: 90)
 - `BATCH_SIZE`: Processing batch size (default: 100)
 
-## File Structure
+## 📁 Project Structure
 
 ```
 Employment_Match/
-├── API.py                 # Main FastAPI application
-├── database.py            # Database models and configuration
-├── auth.py               # Authentication utilities
-├── setup_database.py     # Database setup script
-├── extract_skills.py     # Skill extraction module
-├── extract_cv_skills.py  # CV skill extraction
-├── match_skills.py       # Skill matching logic
-├── generate_embeddings.py # ESCO embeddings generation
-├── convert_esco_to_json.py # ESCO data conversion
-├── requirements.txt      # Python dependencies
-├── DATABASE_GUIDE.md     # Detailed database guide
-├── QUICK_START.md        # Quick start guide
-├── migrations/           # Database migrations
-├── data/                # ESCO skills data
-├── uploads/             # Uploaded CV files
-└── static/              # Static files
+├── employment_match/          # Main application package
+│   ├── __init__.py
+│   ├── API.py                # Main FastAPI application
+│   ├── database.py           # Database models and configuration
+│   ├── auth.py              # Authentication utilities
+│   ├── setup_database.py    # Database setup script
+│   ├── extract_skills.py    # Skill extraction module
+│   ├── extract_cv_skills.py # CV skill extraction
+│   ├── match_skills.py      # Skill matching logic
+│   ├── generate_embeddings.py # ESCO embeddings generation
+│   └── convert_esco_to_json.py # ESCO data conversion
+├── docs/                     # Documentation
+│   ├── API_README.md
+│   ├── API_ENDPOINTS_REFERENCE.md
+│   ├── API_QUICK_REFERENCE.md
+│   ├── DATABASE_GUIDE.md
+│   ├── DOCKER_OPTIMIZATION.md
+│   └── QUICK_START.md
+├── docker/                   # Docker configuration
+│   ├── Dockerfile
+│   ├── Dockerfile.lightweight
+│   └── build-docker.sh
+├── migrations/               # Database migrations
+├── data/                    # ESCO skills data
+├── uploads/                 # Uploaded CV files
+├── docker-compose.yml       # Docker Compose configuration
+├── Dockerfile              # Main Dockerfile
+├── requirements.txt         # Python dependencies
+├── start_server.py         # Server startup script
+├── health_check.py         # Health check endpoint
+├── setup_neon_database.py  # Neon database setup
+├── test_api_endpoints.py   # API testing script
+├── deploy.sh               # Deployment script
+├── cloudbuild.yaml         # Google Cloud Build configuration
+├── alembic.ini             # Alembic configuration
+└── DEPLOYMENT_GUIDE.md     # Deployment guide
 ```
 
-## Dependencies
+## 📦 Dependencies
 
 Key dependencies include:
 
-- FastAPI: Web framework
-- SQLAlchemy: Database ORM
-- PostgreSQL: Database
-- JWT: Authentication
-- Transformers: NLP models
-- Google Generative AI: Skill extraction
-- PyPDF2: PDF processing
+- **FastAPI**: Modern web framework for building APIs
+- **SQLAlchemy**: Database ORM
+- **PostgreSQL**: Primary database
+- **JWT**: Authentication and authorization
+- **Transformers**: NLP models for skill extraction
+- **Google Generative AI**: AI-powered skill extraction
+- **PyPDF2**: PDF processing for CV uploads
+- **Docker**: Containerization
+- **Alembic**: Database migrations
 
 See `requirements.txt` for complete list.
 
-## Documentation
+## 📖 Documentation
 
-- [Quick Start Guide](QUICK_START.md) - Get up and running quickly
-- [Database Guide](DATABASE_GUIDE.md) - Detailed database information
-- [API Documentation](http://localhost:8080/docs) - Interactive API docs
+- [Quick Start Guide](docs/QUICK_START.md) - Get up and running quickly
+- [API Documentation](docs/API_README.md) - Comprehensive API guide
+- [Database Guide](docs/DATABASE_GUIDE.md) - Detailed database information
+- [Deployment Guide](DEPLOYMENT_GUIDE.md) - Production deployment instructions
+- [Docker Optimization](docs/DOCKER_OPTIMIZATION.md) - Docker best practices
+- [Interactive API Docs](http://localhost:8080/docs) - Swagger UI documentation
 
-## Troubleshooting
+## 🐛 Troubleshooting
 
 ### Common Issues
 
@@ -263,9 +359,15 @@ See `requirements.txt` for complete list.
    - Review logs for specific errors
 
 3. **Authentication**
+
    - Ensure SECRET_KEY is set
    - Check JWT token format
    - Verify user exists in database
+
+4. **Docker Issues**
+   - Check Docker and Docker Compose are installed
+   - Verify ports are not in use
+   - Check container logs with `docker-compose logs`
 
 ### Getting Help
 
@@ -273,22 +375,38 @@ See `requirements.txt` for complete list.
 - Review application logs
 - Verify environment variables
 - Run `python setup_database.py` to test database setup
+- Check Docker logs: `docker-compose logs -f`
 
-## Contributing
+## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
 4. Add tests if applicable
-5. Submit a pull request
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
 
-## License
+## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
+## 🙏 Acknowledgments
 
-- ESCO (European Skills/Competences, qualifications and Occupations) for the skills taxonomy
-- Google Gemini API for AI-powered skill extraction
-- FastAPI for the web framework
-- SQLAlchemy for database management
+- **ESCO** (European Skills/Competences, qualifications and Occupations) for the skills taxonomy
+- **Google Gemini API** for AI-powered skill extraction
+- **FastAPI** for the modern web framework
+- **SQLAlchemy** for database management
+- **Docker** for containerization support
+
+## 📞 Support
+
+For support and questions:
+
+- Check the [documentation](docs/)
+- Open an [issue](https://github.com/Talalahmed409/Employment-Match/issues)
+- Review the [API documentation](http://localhost:8080/docs) when running locally
+
+---
+
+**Made with ❤️ for better job matching**
