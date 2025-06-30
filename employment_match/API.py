@@ -6,7 +6,7 @@ FastAPI application for Employment Match - Job Application and Skill Matching Sy
 import os
 import json
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from pathlib import Path
 import tempfile
 import shutil
@@ -35,7 +35,7 @@ import employment_match.generate_embeddings
 from employment_match.database import get_db, create_tables, Company, Candidate, JobPosting, Application, SkillMatch
 from employment_match.auth import (
     get_password_hash, create_access_token, authenticate_company, authenticate_candidate,
-    get_current_company, get_current_candidate, ACCESS_TOKEN_EXPIRE_MINUTES
+    get_current_company, get_current_candidate, ACCESS_TOKEN_EXPIRE_MINUTES, get_current_user
 )
 
 # Configure logging
@@ -178,6 +178,30 @@ class ApplicationDetailResponse(BaseModel):
     missing_skills: Optional[List[str]] = Field(None, description="Missing skills")
     extra_skills: Optional[List[str]] = Field(None, description="Extra skills")
 
+# New Pydantic models for user profile responses
+class CompanyProfileResponse(BaseModel):
+    id: int = Field(..., description="Company ID")
+    name: str = Field(..., description="Company name")
+    email: str = Field(..., description="Company email")
+    description: Optional[str] = Field(None, description="Company description")
+    website: Optional[str] = Field(None, description="Company website")
+    location: Optional[str] = Field(None, description="Company location")
+    industry: Optional[str] = Field(None, description="Company industry")
+    created_at: datetime = Field(..., description="Account creation date")
+
+class CandidateProfileResponse(BaseModel):
+    id: int = Field(..., description="Candidate ID")
+    first_name: str = Field(..., description="First name")
+    last_name: str = Field(..., description="Last name")
+    email: str = Field(..., description="Email address")
+    phone: Optional[str] = Field(None, description="Phone number")
+    location: Optional[str] = Field(None, description="Location")
+    current_title: Optional[str] = Field(None, description="Current job title")
+    years_experience: Optional[int] = Field(None, description="Years of experience")
+    cv_file_path: Optional[str] = Field(None, description="Path to uploaded CV file")
+    extracted_skills: Optional[Dict[str, Any]] = Field(None, description="Extracted skills from CV")
+    created_at: datetime = Field(..., description="Account creation date")
+
 # Global variables for loaded models and data
 esco_skills = None
 embedder = None
@@ -273,7 +297,7 @@ async def register_company(company_data: CompanyRegister, db: Session = Depends(
         access_token=access_token,
         token_type="bearer",
         user_type="company",
-        user_id=company.id
+        user_id=int(str(company.id))
     )
 
 @app.post("/register/candidate", response_model=Token)
@@ -312,7 +336,7 @@ async def register_candidate(candidate_data: CandidateRegister, db: Session = De
         access_token=access_token,
         token_type="bearer",
         user_type="candidate",
-        user_id=candidate.id
+        user_id=int(str(candidate.id))
     )
 
 @app.post("/login/company", response_model=Token)
@@ -336,7 +360,7 @@ async def login_company(login_data: CompanyLogin, db: Session = Depends(get_db))
         access_token=access_token,
         token_type="bearer",
         user_type="company",
-        user_id=company.id
+        user_id=int(str(company.id))
     )
 
 @app.post("/login/candidate", response_model=Token)
@@ -360,8 +384,78 @@ async def login_candidate(login_data: CandidateLogin, db: Session = Depends(get_
         access_token=access_token,
         token_type="bearer",
         user_type="candidate",
-        user_id=candidate.id
+        user_id=int(str(candidate.id))
     )
+
+# User profile endpoints
+@app.get("/profile/company", response_model=CompanyProfileResponse)
+async def get_company_profile(
+    current_company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db)
+):
+    """Get current company's profile information"""
+    return CompanyProfileResponse(
+        id=int(str(current_company.id)),
+        name=str(current_company.name),
+        email=str(current_company.email),
+        description=str(current_company.description) if current_company.description is not None else None,
+        website=str(current_company.website) if current_company.website is not None else None,
+        location=str(current_company.location) if current_company.location is not None else None,
+        industry=str(current_company.industry) if current_company.industry is not None else None,
+        created_at=current_company.created_at
+    )
+
+@app.get("/profile/candidate", response_model=CandidateProfileResponse)
+async def get_candidate_profile(
+    current_candidate: Candidate = Depends(get_current_candidate),
+    db: Session = Depends(get_db)
+):
+    """Get current candidate's profile information"""
+    return CandidateProfileResponse(
+        id=int(str(current_candidate.id)),
+        first_name=str(current_candidate.first_name),
+        last_name=str(current_candidate.last_name),
+        email=str(current_candidate.email),
+        phone=str(current_candidate.phone) if current_candidate.phone is not None else None,
+        location=str(current_candidate.location) if current_candidate.location is not None else None,
+        current_title=str(current_candidate.current_title) if current_candidate.current_title is not None else None,
+        years_experience=int(str(current_candidate.years_experience)) if current_candidate.years_experience is not None else None,
+        cv_file_path=str(current_candidate.cv_file_path) if current_candidate.cv_file_path is not None else None,
+        extracted_skills=current_candidate.extracted_skills,
+        created_at=current_candidate.created_at
+    )
+
+@app.get("/profile/me")
+async def get_my_profile(
+    current_user: Union[Company, Candidate] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get current user's profile (works for both companies and candidates)"""
+    if isinstance(current_user, Company):
+        return CompanyProfileResponse(
+            id=int(str(current_user.id)),
+            name=str(current_user.name),
+            email=str(current_user.email),
+            description=str(current_user.description) if current_user.description is not None else None,
+            website=str(current_user.website) if current_user.website is not None else None,
+            location=str(current_user.location) if current_user.location is not None else None,
+            industry=str(current_user.industry) if current_user.industry is not None else None,
+            created_at=current_user.created_at
+        )
+    else:  # Candidate
+        return CandidateProfileResponse(
+            id=int(str(current_user.id)),
+            first_name=str(current_user.first_name),
+            last_name=str(current_user.last_name),
+            email=str(current_user.email),
+            phone=str(current_user.phone) if current_user.phone is not None else None,
+            location=str(current_user.location) if current_user.location is not None else None,
+            current_title=str(current_user.current_title) if current_user.current_title is not None else None,
+            years_experience=int(str(current_user.years_experience)) if current_user.years_experience is not None else None,
+            cv_file_path=str(current_user.cv_file_path) if current_user.cv_file_path is not None else None,
+            extracted_skills=current_user.extracted_skills,
+            created_at=current_user.created_at
+        )
 
 # Job posting endpoints
 @app.post("/jobs", response_model=JobPostingResponse)
@@ -403,18 +497,18 @@ async def create_job_posting(
     db.refresh(job_posting)
     
     return JobPostingResponse(
-        id=job_posting.id,
-        title=job_posting.title,
-        description=job_posting.description,
+        id=int(job_posting.id),
+        title=str(job_posting.title),
+        description=str(job_posting.description),
         requirements=job_posting.requirements,
         location=job_posting.location,
         salary_min=job_posting.salary_min,
         salary_max=job_posting.salary_max,
         employment_type=job_posting.employment_type,
         experience_level=job_posting.experience_level,
-        company_name=current_company.name,
+        company_name=str(current_company.name),
         created_at=job_posting.created_at,
-        is_active=job_posting.is_active
+        is_active=bool(job_posting.is_active)
     )
 
 @app.get("/jobs", response_model=List[JobPostingResponse])
@@ -430,18 +524,18 @@ async def get_job_postings(
     for job in job_postings:
         company = db.query(Company).filter(Company.id == job.company_id).first()
         result.append(JobPostingResponse(
-            id=job.id,
-            title=job.title,
-            description=job.description,
+            id=int(job.id),
+            title=str(job.title),
+            description=str(job.description),
             requirements=job.requirements,
             location=job.location,
             salary_min=job.salary_min,
             salary_max=job.salary_max,
             employment_type=job.employment_type,
             experience_level=job.experience_level,
-            company_name=company.name if company else "Unknown",
+            company_name=str(company.name) if company else "Unknown",
             created_at=job.created_at,
-            is_active=job.is_active
+            is_active=bool(job.is_active)
         ))
     
     return result
@@ -455,18 +549,18 @@ async def get_job_posting(job_id: int, db: Session = Depends(get_db)):
     
     company = db.query(Company).filter(Company.id == job_posting.company_id).first()
     return JobPostingResponse(
-        id=job_posting.id,
-        title=job_posting.title,
-        description=job_posting.description,
+        id=int(job_posting.id),
+        title=str(job_posting.title),
+        description=str(job_posting.description),
         requirements=job_posting.requirements,
         location=job_posting.location,
         salary_min=job_posting.salary_min,
         salary_max=job_posting.salary_max,
         employment_type=job_posting.employment_type,
         experience_level=job_posting.experience_level,
-        company_name=company.name if company else "Unknown",
+        company_name=str(company.name) if company else "Unknown",
         created_at=job_posting.created_at,
-        is_active=job_posting.is_active
+        is_active=bool(job_posting.is_active)
     )
 
 # Application endpoints
