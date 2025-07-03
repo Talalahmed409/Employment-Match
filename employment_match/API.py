@@ -24,6 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, EmailStr
 import uvicorn
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 # Import our existing modules
 from employment_match.extract_skills import extract_skills, load_esco_skills, load_embedder
@@ -992,6 +993,46 @@ async def get_esco_skills_info():
     except Exception as e:
         logger.error(f"Error getting ESCO skills info: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+class JobPostingWithCountResponse(JobPostingResponse):
+    application_count: int = Field(..., description="Number of applications received for this job")
+
+@app.get("/company/jobs", response_model=List[JobPostingWithCountResponse])
+async def get_company_jobs(
+    current_company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db)
+):
+    """Get all jobs posted by the current company, with application counts"""
+    # Get all jobs for this company
+    jobs = db.query(JobPosting).filter(JobPosting.company_id == current_company.id).all()
+    job_ids = [job.id for job in jobs]
+    
+    # Get application counts for all jobs in one query
+    application_counts = dict(
+        db.query(Application.job_posting_id, func.count(Application.id))
+        .filter(Application.job_posting_id.in_(job_ids))
+        .group_by(Application.job_posting_id)
+        .all()
+    ) if job_ids else {}
+
+    result = []
+    for job in jobs:
+        result.append(JobPostingWithCountResponse(
+            id=int(job.id),
+            title=str(job.title),
+            description=str(job.description),
+            requirements=job.requirements,
+            location=job.location,
+            salary_min=job.salary_min,
+            salary_max=job.salary_max,
+            employment_type=job.employment_type,
+            experience_level=job.experience_level,
+            company_name=str(current_company.name),
+            created_at=job.created_at,
+            is_active=bool(job.is_active),
+            application_count=application_counts.get(job.id, 0)
+        ))
+    return result
 
 if __name__ == "__main__":
     uvicorn.run(
