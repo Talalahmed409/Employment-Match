@@ -38,6 +38,7 @@ from employment_match.auth import (
     get_password_hash, create_access_token, authenticate_company, authenticate_candidate,
     get_current_company, get_current_candidate, ACCESS_TOKEN_EXPIRE_MINUTES, get_current_user
 )
+from employment_match.google_auth import authenticate_google_user
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -124,6 +125,10 @@ class CandidateRegister(BaseModel):
 class CandidateLogin(BaseModel):
     email: EmailStr = Field(..., description="Email address")
     password: str = Field(..., description="Password")
+
+class GoogleAuthRequest(BaseModel):
+    token: str = Field(..., description="Google ID token from frontend")
+    user_type: str = Field(..., description="User type (company or candidate)")
 
 class Token(BaseModel):
     access_token: str = Field(..., description="JWT access token")
@@ -386,6 +391,33 @@ async def login_candidate(login_data: CandidateLogin, db: Session = Depends(get_
         token_type="bearer",
         user_type="candidate",
         user_id=int(str(candidate.id))
+    )
+
+# Google OAuth endpoints
+@app.post("/auth/google", response_model=Token)
+async def google_auth(auth_data: GoogleAuthRequest, db: Session = Depends(get_db)):
+    """Authenticate user with Google OAuth"""
+    if auth_data.user_type not in ["company", "candidate"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user_type. Must be 'company' or 'candidate'"
+        )
+    
+    # Authenticate with Google
+    user = authenticate_google_user(db, auth_data.token, auth_data.user_type)
+    
+    # Create access token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": str(user.id), "user_type": auth_data.user_type},
+        expires_delta=access_token_expires
+    )
+    
+    return Token(
+        access_token=access_token,
+        token_type="bearer",
+        user_type=auth_data.user_type,
+        user_id=int(str(user.id))
     )
 
 # User profile endpoints

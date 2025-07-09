@@ -36,6 +36,8 @@ class Company(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     is_active = Column(Boolean, default=True)
+    google_id = Column(String(255), nullable=True, unique=True, index=True)  # Google OAuth ID
+    is_google_user = Column(Boolean, default=False)  # Flag for Google OAuth users
     
     # Relationships
     job_postings = relationship("JobPosting", back_populates="company", cascade="all, delete-orphan")
@@ -59,6 +61,8 @@ class Candidate(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     is_active = Column(Boolean, default=True)
+    google_id = Column(String(255), nullable=True, unique=True, index=True)  # Google OAuth ID
+    is_google_user = Column(Boolean, default=False)  # Flag for Google OAuth users
     
     # Relationships
     applications = relationship("Application", back_populates="candidate", cascade="all, delete-orphan")
