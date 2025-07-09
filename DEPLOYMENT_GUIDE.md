@@ -1,6 +1,6 @@
 # Employment Match - Google Cloud Run Deployment Guide
 
-This guide will walk you through deploying the Employment Match application to Google Cloud Run with a Neon database.
+This guide will walk you through deploying the Employment Match application to Google Cloud Run with a Neon database and Google OAuth authentication.
 
 ## Prerequisites
 
@@ -67,6 +67,15 @@ export DATABASE_URL="postgresql://neondb_owner:npg_ZoB1Unqpc3rJ@ep-red-salad-a20
 python setup_neon_database.py
 ```
 
+### 2.4 Set Up Google OAuth Database Fields
+
+```bash
+# Run the Google OAuth migration
+python migrate_neon_google_oauth.py
+```
+
+This will add the necessary database fields for Google OAuth authentication.
+
 ## Step 3: Configure Environment Variables
 
 ### 3.1 Set Required Environment Variables
@@ -77,6 +86,9 @@ export DATABASE_URL="postgresql://neondb_owner:npg_ZoB1Unqpc3rJ@ep-red-salad-a20
 
 # Secret key for JWT tokens (generate a secure random string)
 export SECRET_KEY="your-super-secret-key-here"
+
+# Google OAuth client ID (for authentication)
+export GOOGLE_CLIENT_ID="248629291681-ep686slgour47ovifcr6pgvasagi1amb.apps.googleusercontent.com"
 
 # Optional: Gemini API key for enhanced features
 export GEMINI_API_KEY="your-gemini-api-key"
@@ -101,6 +113,8 @@ The `deploy.sh` script is already configured with:
 
 ### 4.2 Run the Deployment Script
 
+#### Option A: Standard Deployment
+
 ```bash
 # Make the script executable (if not already)
 chmod +x deploy.sh
@@ -108,6 +122,23 @@ chmod +x deploy.sh
 # Run the deployment
 ./deploy.sh
 ```
+
+#### Option B: Deployment with Google OAuth (Recommended)
+
+```bash
+# Make the script executable (if not already)
+chmod +x deploy_with_google_oauth.sh
+
+# Run the deployment with Google OAuth support
+./deploy_with_google_oauth.sh
+```
+
+The Google OAuth deployment script will:
+
+- Run the database migration automatically
+- Set up Google OAuth environment variables
+- Deploy with all necessary configurations
+- Test the Google OAuth endpoint after deployment
 
 ### 4.3 Manual Deployment (Alternative)
 
@@ -130,7 +161,7 @@ gcloud run deploy employment-match-final \
     --cpu 2 \
     --max-instances 10 \
     --timeout 300 \
-    --set-env-vars "DATABASE_URL=$DATABASE_URL,SECRET_KEY=$SECRET_KEY,GEMINI_API_KEY=$GEMINI_API_KEY"
+    --set-env-vars "DATABASE_URL=$DATABASE_URL,SECRET_KEY=$SECRET_KEY,GEMINI_API_KEY=$GEMINI_API_KEY,GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID"
 ```
 
 ## Step 5: Verify Deployment
@@ -151,6 +182,28 @@ curl https://your-service-url/health
 - Navigate to `/docs` for Swagger UI documentation
 - Navigate to `/redoc` for ReDoc documentation
 
+### 5.3 Test Google OAuth Endpoint
+
+```bash
+# Test the Google OAuth endpoint
+curl -X POST "https://your-service-url/auth/google" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "test_token",
+    "user_type": "candidate"
+  }'
+```
+
+Expected response for invalid token:
+
+```json
+{
+  "detail": "Google authentication failed: Invalid token"
+}
+```
+
+This confirms the Google OAuth endpoint is working correctly.
+
 ## Step 6: Set Up CI/CD (Optional)
 
 ### 6.1 Configure Cloud Build
@@ -166,6 +219,7 @@ In your Cloud Build trigger, set these substitution variables:
 
 - `_DATABASE_URL`: `postgresql://neondb_owner:npg_ZoB1Unqpc3rJ@ep-red-salad-a20vuj1d.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require`
 - `_SECRET_KEY`: Your secret key
+- `_GOOGLE_CLIENT_ID`: `248629291681-ep686slgour47ovifcr6pgvasagi1amb.apps.googleusercontent.com`
 - `_GEMINI_API_KEY`: Your Gemini API key (optional)
 
 ## Step 7: Custom Domain (Optional)

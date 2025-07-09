@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Employment Match - Google Cloud Run Deployment Script
-# This script deploys the application to Google Cloud Run with Neon database
+# Employment Match - Google Cloud Run Deployment with Google OAuth
+# This script deploys the application with Google OAuth support
 
 set -e
 
 # Configuration
-PROJECT_ID="employment-match-final"  # Replace with your Google Cloud project ID
+PROJECT_ID="employment-match-final"
 REGION="europe-north1"
 SERVICE_NAME="employment-match-final"
 IMAGE_NAME="gcr.io/$PROJECT_ID/$SERVICE_NAME"
@@ -15,10 +15,11 @@ IMAGE_NAME="gcr.io/$PROJECT_ID/$SERVICE_NAME"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}🚀 Employment Match - Google Cloud Run Deployment${NC}"
-echo "=================================================="
+echo -e "${GREEN}🚀 Employment Match - Google Cloud Run Deployment with Google OAuth${NC}"
+echo "=================================================================="
 
 # Check if gcloud is installed
 if ! command -v gcloud &> /dev/null; then
@@ -50,7 +51,7 @@ gcloud services enable cloudbuild.googleapis.com
 gcloud services enable run.googleapis.com
 gcloud services enable containerregistry.googleapis.com
 
-# Check if environment variables are set
+# Check environment variables
 if [ -z "$DATABASE_URL" ]; then
     echo -e "${RED}❌ DATABASE_URL environment variable is not set.${NC}"
     echo "Please set your Neon database URL:"
@@ -65,11 +66,29 @@ if [ -z "$SECRET_KEY" ]; then
     exit 1
 fi
 
-# Check if Google OAuth client ID is set
+# Set Google OAuth client ID
 if [ -z "$GOOGLE_CLIENT_ID" ]; then
     echo -e "${YELLOW}⚠️  GOOGLE_CLIENT_ID environment variable is not set.${NC}"
     echo "Setting default Google OAuth client ID..."
     export GOOGLE_CLIENT_ID="248629291681-ep686slgour47ovifcr6pgvasagi1amb.apps.googleusercontent.com"
+fi
+
+echo -e "${BLUE}🔐 Google OAuth Configuration:${NC}"
+echo "   Client ID: $GOOGLE_CLIENT_ID"
+
+# Run database migration for Google OAuth
+echo -e "${YELLOW}🗄️  Running Google OAuth database migration...${NC}"
+if python migrate_neon_google_oauth.py; then
+    echo -e "${GREEN}✅ Database migration completed successfully!${NC}"
+else
+    echo -e "${RED}❌ Database migration failed. Please check the error above.${NC}"
+    echo "You can run the migration manually:"
+    echo "python migrate_neon_google_oauth.py"
+    read -p "Continue with deployment anyway? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
 fi
 
 # Build and push the Docker image
@@ -95,16 +114,33 @@ gcloud run deploy $SERVICE_NAME \
 SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region=$REGION --format="value(status.url)")
 
 echo -e "${GREEN}✅ Deployment completed successfully!${NC}"
-echo "=================================================="
+echo "=================================================================="
 echo -e "${GREEN}🌐 Service URL: $SERVICE_URL${NC}"
 echo -e "${GREEN}📚 API Documentation: $SERVICE_URL/docs${NC}"
 echo -e "${GREEN}🔍 Health Check: $SERVICE_URL/health${NC}"
+echo -e "${GREEN}🔐 Google OAuth Endpoint: $SERVICE_URL/auth/google${NC}"
+echo ""
+echo -e "${BLUE}🔐 Google OAuth Testing:${NC}"
+echo "1. Test the Google OAuth endpoint:"
+echo "   POST $SERVICE_URL/auth/google"
+echo "   Body: {\"token\": \"google_id_token\", \"user_type\": \"company\" or \"candidate\"}"
+echo ""
+echo "2. Verify with your frontend Google Sign-In implementation"
 echo ""
 echo -e "${YELLOW}📝 Next steps:${NC}"
-echo "1. Test the API endpoints using the documentation"
-echo "2. Set up a custom domain if needed"
-echo "3. Configure monitoring and logging"
-echo "4. Set up CI/CD pipeline with Cloud Build"
+echo "1. Test the Google OAuth endpoint using the documentation"
+echo "2. Verify your frontend can authenticate with Google"
+echo "3. Set up a custom domain if needed"
+echo "4. Configure monitoring and logging"
+
+# Test the Google OAuth endpoint
+echo -e "${BLUE}🧪 Testing Google OAuth endpoint...${NC}"
+if curl -s -f "$SERVICE_URL/health" > /dev/null; then
+    echo -e "${GREEN}✅ Health check passed - service is running${NC}"
+    echo -e "${GREEN}✅ Google OAuth endpoint is available at: $SERVICE_URL/auth/google${NC}"
+else
+    echo -e "${RED}❌ Health check failed - service may not be running properly${NC}"
+fi
 
 # Optional: Set up custom domain
 read -p "Do you want to set up a custom domain? (y/n): " -n 1 -r
