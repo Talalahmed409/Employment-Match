@@ -38,6 +38,7 @@ class Company(Base):
     is_active = Column(Boolean, default=True)
     google_id = Column(String(255), nullable=True, unique=True, index=True)  # Google OAuth ID
     is_google_user = Column(Boolean, default=False)  # Flag for Google OAuth users
+    profile_complete = Column(Boolean, default=True)  # Profile completion status (True for non-Google users)
     
     # Relationships
     job_postings = relationship("JobPosting", back_populates="company", cascade="all, delete-orphan")
@@ -63,6 +64,7 @@ class Candidate(Base):
     is_active = Column(Boolean, default=True)
     google_id = Column(String(255), nullable=True, unique=True, index=True)  # Google OAuth ID
     is_google_user = Column(Boolean, default=False)  # Flag for Google OAuth users
+    profile_complete = Column(Boolean, default=True)  # Profile completion status (True for non-Google users)
     
     # Relationships
     applications = relationship("Application", back_populates="candidate", cascade="all, delete-orphan")

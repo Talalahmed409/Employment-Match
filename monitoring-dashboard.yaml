@@ -1,0 +1,190 @@
+displayName: "Employment Match Chat - Monitoring Dashboard"
+gridLayout:
+  columns: "2"
+  widgets:
+    - title: "Request Rate"
+      xyChart:
+        dataSets:
+          - timeSeriesQuery:
+              timeSeriesFilter:
+                filter: 'metric.type="run.googleapis.com/request_count" AND resource.labels.service_name="employment-match-chat"'
+                aggregation:
+                  perSeriesAligner: ALIGN_RATE
+                  crossSeriesReducer: REDUCE_SUM
+                  alignmentPeriod: 60s
+        timeshiftDuration: 0s
+        yAxis:
+          label: "Requests/sec"
+          scale: LINEAR
+        chartOptions:
+          mode: COLOR
+
+    - title: "Response Time"
+      xyChart:
+        dataSets:
+          - timeSeriesQuery:
+              timeSeriesFilter:
+                filter: 'metric.type="run.googleapis.com/request_latencies" AND resource.labels.service_name="employment-match-chat"'
+                aggregation:
+                  perSeriesAligner: ALIGN_PERCENTILE_95
+                  crossSeriesReducer: REDUCE_MEAN
+                  alignmentPeriod: 60s
+        timeshiftDuration: 0s
+        yAxis:
+          label: "Latency (ms)"
+          scale: LINEAR
+        chartOptions:
+          mode: COLOR
+
+    - title: "Memory Usage"
+      xyChart:
+        dataSets:
+          - timeSeriesQuery:
+              timeSeriesFilter:
+                filter: 'metric.type="run.googleapis.com/container/memory/bytes_used" AND resource.labels.service_name="employment-match-chat"'
+                aggregation:
+                  perSeriesAligner: ALIGN_MEAN
+                  crossSeriesReducer: REDUCE_MEAN
+                  alignmentPeriod: 60s
+        timeshiftDuration: 0s
+        yAxis:
+          label: "Memory (MB)"
+          scale: LINEAR
+        chartOptions:
+          mode: COLOR
+
+    - title: "CPU Usage"
+      xyChart:
+        dataSets:
+          - timeSeriesQuery:
+              timeSeriesFilter:
+                filter: 'metric.type="run.googleapis.com/container/cpu/utilizations" AND resource.labels.service_name="employment-match-chat"'
+                aggregation:
+                  perSeriesAligner: ALIGN_MEAN
+                  crossSeriesReducer: REDUCE_MEAN
+                  alignmentPeriod: 60s
+        timeshiftDuration: 0s
+        yAxis:
+          label: "CPU %"
+          scale: LINEAR
+        chartOptions:
+          mode: COLOR
+
+    - title: "Active Instances"
+      xyChart:
+        dataSets:
+          - timeSeriesQuery:
+              timeSeriesFilter:
+                filter: 'metric.type="run.googleapis.com/container/instance_count" AND resource.labels.service_name="employment-match-chat"'
+                aggregation:
+                  perSeriesAligner: ALIGN_MEAN
+                  crossSeriesReducer: REDUCE_MEAN
+                  alignmentPeriod: 60s
+        timeshiftDuration: 0s
+        yAxis:
+          label: "Instances"
+          scale: LINEAR
+        chartOptions:
+          mode: COLOR
+
+    - title: "Error Rate"
+      xyChart:
+        dataSets:
+          - timeSeriesQuery:
+              timeSeriesFilter:
+                filter: 'metric.type="run.googleapis.com/request_count" AND resource.labels.service_name="employment-match-chat" AND metric.labels.response_code_class="5"'
+                aggregation:
+                  perSeriesAligner: ALIGN_RATE
+                  crossSeriesReducer: REDUCE_SUM
+                  alignmentPeriod: 60s
+        timeshiftDuration: 0s
+        yAxis:
+          label: "Errors/sec"
+          scale: LINEAR
+        chartOptions:
+          mode: COLOR
+
+    - title: "Chat Endpoint Usage"
+      xyChart:
+        dataSets:
+          - timeSeriesQuery:
+              timeSeriesFilter:
+                filter: 'metric.type="run.googleapis.com/request_count" AND resource.labels.service_name="employment-match-chat" AND http.request.url CONTAINS "/chat/"'
+                aggregation:
+                  perSeriesAligner: ALIGN_RATE
+                  crossSeriesReducer: REDUCE_SUM
+                  alignmentPeriod: 60s
+        timeshiftDuration: 0s
+        yAxis:
+          label: "Chat Requests/sec"
+          scale: LINEAR
+        chartOptions:
+          mode: COLOR
+
+    - title: "Gemini API Response Time"
+      xyChart:
+        dataSets:
+          - timeSeriesQuery:
+              timeSeriesFilter:
+                filter: 'metric.type="custom.googleapis.com/gemini_api_latency" AND resource.labels.service_name="employment-match-chat"'
+                aggregation:
+                  perSeriesAligner: ALIGN_MEAN
+                  crossSeriesReducer: REDUCE_MEAN
+                  alignmentPeriod: 60s
+        timeshiftDuration: 0s
+        yAxis:
+          label: "Gemini Latency (ms)"
+          scale: LINEAR
+        chartOptions:
+          mode: COLOR
+
+    - title: "ChromaDB Operations"
+      xyChart:
+        dataSets:
+          - timeSeriesQuery:
+              timeSeriesFilter:
+                filter: 'metric.type="custom.googleapis.com/chromadb_operations" AND resource.labels.service_name="employment-match-chat"'
+                aggregation:
+                  perSeriesAligner: ALIGN_RATE
+                  crossSeriesReducer: REDUCE_SUM
+                  alignmentPeriod: 60s
+        timeshiftDuration: 0s
+        yAxis:
+          label: "ChromaDB Ops/sec"
+          scale: LINEAR
+        chartOptions:
+          mode: COLOR
+
+    - title: "Database Connections"
+      xyChart:
+        dataSets:
+          - timeSeriesQuery:
+              timeSeriesFilter:
+                filter: 'metric.type="custom.googleapis.com/db_connections" AND resource.labels.service_name="employment-match-chat"'
+                aggregation:
+                  perSeriesAligner: ALIGN_MEAN
+                  crossSeriesReducer: REDUCE_MEAN
+                  alignmentPeriod: 60s
+        timeshiftDuration: 0s
+        yAxis:
+          label: "Active Connections"
+          scale: LINEAR
+        chartOptions:
+          mode: COLOR
+
+    - title: "Health Check Status"
+      xyChart:
+        dataSets:
+          - timeSeriesQuery:
+              timeSeriesFilter:
+                filter: 'metric.type="run.googleapis.com/request_count" AND resource.labels.service_name="employment-match-chat" AND http.request.url="/health"'
+                aggregation:
+                  perSeriesAligner: ALIGN_RATE
+                  crossSeriesReducer: REDUCE_SUM
+                  alignmentPeriod: 60s
+        timeshiftDuration: 0s
+        yAxis:
+          label: "Health Checks/sec"
+          scale: LINEAR
+        chartOptions:
+          mode: COLOR

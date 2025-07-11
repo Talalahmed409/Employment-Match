@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Uploads (these will be created at runtime)
+uploads/
+
+# Documentation (not needed for build)
+docs/
+
+# Test files
+test_*.py
+*_test.py
+
+# Migration files (already applied)
+migrations/
+
+# Local config
+.env
+.env.local 

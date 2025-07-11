@@ -39,6 +39,7 @@ from employment_match.auth import (
     get_current_company, get_current_candidate, ACCESS_TOKEN_EXPIRE_MINUTES, get_current_user
 )
 from employment_match.google_auth import authenticate_google_user
+from employment_match.hr_assistant import hr_assistant
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -112,6 +113,13 @@ class CompanyLogin(BaseModel):
     email: EmailStr = Field(..., description="Company email")
     password: str = Field(..., description="Password")
 
+class CompanyProfileUpdate(BaseModel):
+    name: Optional[str] = Field(None, description="Company name")
+    description: Optional[str] = Field(None, description="Company description")
+    website: Optional[str] = Field(None, description="Company website")
+    location: Optional[str] = Field(None, description="Company location")
+    industry: Optional[str] = Field(None, description="Company industry")
+
 class CandidateRegister(BaseModel):
     first_name: str = Field(..., description="First name")
     last_name: str = Field(..., description="Last name")
@@ -126,15 +134,32 @@ class CandidateLogin(BaseModel):
     email: EmailStr = Field(..., description="Email address")
     password: str = Field(..., description="Password")
 
+class CandidateProfileUpdate(BaseModel):
+    first_name: Optional[str] = Field(None, description="First name")
+    last_name: Optional[str] = Field(None, description="Last name")
+    phone: Optional[str] = Field(None, description="Phone number")
+    location: Optional[str] = Field(None, description="Location")
+    current_title: Optional[str] = Field(None, description="Current job title")
+    years_experience: Optional[int] = Field(None, description="Years of experience")
+
 class GoogleAuthRequest(BaseModel):
     token: str = Field(..., description="Google ID token from frontend")
     user_type: str = Field(..., description="User type (company or candidate)")
 
 class Token(BaseModel):
     access_token: str = Field(..., description="JWT access token")
-    token_type: str = Field(..., description="Token type")
+    token_type: str = Field(..., description="Token type (bearer)")
     user_type: str = Field(..., description="User type (company or candidate)")
     user_id: int = Field(..., description="User ID")
+    profile_complete: Optional[bool] = Field(None, description="Whether profile is complete (for Google OAuth users)")
+
+class GoogleAuthResponse(BaseModel):
+    access_token: str = Field(..., description="JWT access token")
+    token_type: str = Field(..., description="Token type (bearer)")
+    user_type: str = Field(..., description="User type (company or candidate)")
+    user_id: int = Field(..., description="User ID")
+    profile_complete: bool = Field(..., description="Whether profile is complete")
+    is_new_user: bool = Field(..., description="Whether this is a new user")
 
 class JobPostingCreate(BaseModel):
     title: str = Field(..., description="Job title")
@@ -303,7 +328,8 @@ async def register_company(company_data: CompanyRegister, db: Session = Depends(
         access_token=access_token,
         token_type="bearer",
         user_type="company",
-        user_id=int(str(company.id))
+        user_id=int(str(company.id)),
+        profile_complete=False # Company registration doesn't have profile completion
     )
 
 @app.post("/register/candidate", response_model=Token)
@@ -342,7 +368,8 @@ async def register_candidate(candidate_data: CandidateRegister, db: Session = De
         access_token=access_token,
         token_type="bearer",
         user_type="candidate",
-        user_id=int(str(candidate.id))
+        user_id=int(str(candidate.id)),
+        profile_complete=False # Candidate registration doesn't have profile completion
     )
 
 @app.post("/login/company", response_model=Token)
@@ -366,7 +393,8 @@ async def login_company(login_data: CompanyLogin, db: Session = Depends(get_db))
         access_token=access_token,
         token_type="bearer",
         user_type="company",
-        user_id=int(str(company.id))
+        user_id=int(str(company.id)),
+        profile_complete=False # Company login doesn't have profile completion
     )
 
 @app.post("/login/candidate", response_model=Token)
@@ -390,11 +418,12 @@ async def login_candidate(login_data: CandidateLogin, db: Session = Depends(get_
         access_token=access_token,
         token_type="bearer",
         user_type="candidate",
-        user_id=int(str(candidate.id))
+        user_id=int(str(candidate.id)),
+        profile_complete=False # Candidate login doesn't have profile completion
     )
 
 # Google OAuth endpoints
-@app.post("/auth/google", response_model=Token)
+@app.post("/auth/google", response_model=GoogleAuthResponse)
 async def google_auth(auth_data: GoogleAuthRequest, db: Session = Depends(get_db)):
     """Authenticate user with Google OAuth"""
     if auth_data.user_type not in ["company", "candidate"]:
@@ -404,7 +433,7 @@ async def google_auth(auth_data: GoogleAuthRequest, db: Session = Depends(get_db
         )
     
     # Authenticate with Google
-    user = authenticate_google_user(db, auth_data.token, auth_data.user_type)
+    user, is_new_user = authenticate_google_user(db, auth_data.token, auth_data.user_type)
     
     # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -413,11 +442,13 @@ async def google_auth(auth_data: GoogleAuthRequest, db: Session = Depends(get_db
         expires_delta=access_token_expires
     )
     
-    return Token(
+    return GoogleAuthResponse(
         access_token=access_token,
         token_type="bearer",
         user_type=auth_data.user_type,
-        user_id=int(str(user.id))
+        user_id=int(str(user.id)),
+        profile_complete=user.profile_complete,
+        is_new_user=is_new_user
     )
 
 # User profile endpoints
@@ -438,12 +469,91 @@ async def get_company_profile(
         created_at=current_company.created_at
     )
 
+@app.put("/profile/company", response_model=CompanyProfileResponse)
+async def update_company_profile(
+    profile_data: CompanyProfileUpdate,
+    current_company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db)
+):
+    """Update company profile information"""
+    # Update profile fields
+    if profile_data.name is not None:
+        current_company.name = profile_data.name
+    if profile_data.description is not None:
+        current_company.description = profile_data.description
+    if profile_data.website is not None:
+        current_company.website = profile_data.website
+    if profile_data.location is not None:
+        current_company.location = profile_data.location
+    if profile_data.industry is not None:
+        current_company.industry = profile_data.industry
+    
+    # Mark profile as complete for Google OAuth users
+    if current_company.is_google_user:
+        current_company.profile_complete = True
+    
+    db.commit()
+    db.refresh(current_company)
+    
+    return CompanyProfileResponse(
+        id=int(str(current_company.id)),
+        name=str(current_company.name),
+        email=str(current_company.email),
+        description=str(current_company.description) if current_company.description is not None else None,
+        website=str(current_company.website) if current_company.website is not None else None,
+        location=str(current_company.location) if current_company.location is not None else None,
+        industry=str(current_company.industry) if current_company.industry is not None else None,
+        created_at=current_company.created_at
+    )
+
 @app.get("/profile/candidate", response_model=CandidateProfileResponse)
 async def get_candidate_profile(
     current_candidate: Candidate = Depends(get_current_candidate),
     db: Session = Depends(get_db)
 ):
     """Get current candidate's profile information"""
+    return CandidateProfileResponse(
+        id=int(str(current_candidate.id)),
+        first_name=str(current_candidate.first_name),
+        last_name=str(current_candidate.last_name),
+        email=str(current_candidate.email),
+        phone=str(current_candidate.phone) if current_candidate.phone is not None else None,
+        location=str(current_candidate.location) if current_candidate.location is not None else None,
+        current_title=str(current_candidate.current_title) if current_candidate.current_title is not None else None,
+        years_experience=int(str(current_candidate.years_experience)) if current_candidate.years_experience is not None else None,
+        cv_file_path=str(current_candidate.cv_file_path) if current_candidate.cv_file_path is not None else None,
+        extracted_skills=current_candidate.extracted_skills,
+        created_at=current_candidate.created_at
+    )
+
+@app.put("/profile/candidate", response_model=CandidateProfileResponse)
+async def update_candidate_profile(
+    profile_data: CandidateProfileUpdate,
+    current_candidate: Candidate = Depends(get_current_candidate),
+    db: Session = Depends(get_db)
+):
+    """Update candidate profile information"""
+    # Update profile fields
+    if profile_data.first_name is not None:
+        current_candidate.first_name = profile_data.first_name
+    if profile_data.last_name is not None:
+        current_candidate.last_name = profile_data.last_name
+    if profile_data.phone is not None:
+        current_candidate.phone = profile_data.phone
+    if profile_data.location is not None:
+        current_candidate.location = profile_data.location
+    if profile_data.current_title is not None:
+        current_candidate.current_title = profile_data.current_title
+    if profile_data.years_experience is not None:
+        current_candidate.years_experience = profile_data.years_experience
+    
+    # Mark profile as complete for Google OAuth users
+    if current_candidate.is_google_user:
+        current_candidate.profile_complete = True
+    
+    db.commit()
+    db.refresh(current_candidate)
+    
     return CandidateProfileResponse(
         id=int(str(current_candidate.id)),
         first_name=str(current_candidate.first_name),
@@ -1029,6 +1139,14 @@ async def get_esco_skills_info():
 class JobPostingWithCountResponse(JobPostingResponse):
     application_count: int = Field(..., description="Number of applications received for this job")
 
+# Chat-related Pydantic models
+class ChatMessage(BaseModel):
+    message: str = Field(..., description="Chat message from user")
+
+class ChatResponse(BaseModel):
+    response: str = Field(..., description="AI assistant response")
+    intent: Optional[str] = Field(None, description="Detected intent of the message")
+
 @app.get("/company/jobs", response_model=List[JobPostingWithCountResponse])
 async def get_company_jobs(
     current_company: Company = Depends(get_current_company),
@@ -1065,6 +1183,107 @@ async def get_company_jobs(
             application_count=application_counts.get(job.id, 0)
         ))
     return result
+
+# HR Assistant Chat Endpoints
+
+@app.post("/chat/message", response_model=ChatResponse)
+async def chat_with_assistant(
+    chat_data: ChatMessage,
+    current_company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db)
+):
+    """Chat with the HR assistant"""
+    try:
+        # Configure Gemini with hardcoded API key
+        hr_assistant.configure_gemini("AIzaSyDN_lLLx9scBj1ZRo9QaNDgwCTl6tr-Kss")
+        
+        # Ensure HR assistant is initialized with company data
+        if not hasattr(hr_assistant, 'db_session') or hr_assistant.db_session is None:
+            # Initialize with company data using the current company's ID and database session
+            hr_assistant.initialize_company_data(str(current_company.id), db)
+        
+        # Get response from assistant
+        response = hr_assistant.chat(chat_data.message)
+        
+        # Detect intent for additional context
+        intent = hr_assistant._classify_intent(chat_data.message)
+        
+        return ChatResponse(
+            response=response,
+            intent=intent
+        )
+    except Exception as e:
+        logger.error(f"Error in chat: {e}")
+        return ChatResponse(
+            response=f"❌ Error: {str(e)}",
+            intent="error"
+        )
+
+@app.get("/chat/summary")
+async def get_hiring_summary(
+    current_company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db)
+):
+    """Get hiring summary from HR assistant"""
+    try:
+        # Configure Gemini with hardcoded API key
+        hr_assistant.configure_gemini("AIzaSyDN_lLLx9scBj1ZRo9QaNDgwCTl6tr-Kss")
+        
+        # Ensure HR assistant is initialized
+        if not hasattr(hr_assistant, 'db_session') or hr_assistant.db_session is None:
+            hr_assistant.initialize_company_data(str(current_company.id), db)
+        
+        summary = hr_assistant.get_hiring_summary()
+        return summary
+    except Exception as e:
+        logger.error(f"Error getting hiring summary: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/chat/best-candidate")
+async def get_best_candidate(
+    current_company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db)
+):
+    """Get best candidate analysis from HR assistant"""
+    try:
+        # Configure Gemini with hardcoded API key
+        hr_assistant.configure_gemini("AIzaSyDN_lLLx9scBj1ZRo9QaNDgwCTl6tr-Kss")
+        
+        # Ensure HR assistant is initialized
+        if not hasattr(hr_assistant, 'db_session') or hr_assistant.db_session is None:
+            hr_assistant.initialize_company_data(str(current_company.id), db)
+        
+        analysis = hr_assistant.get_best_candidate_analysis()
+        return {"analysis": analysis}
+    except Exception as e:
+        logger.error(f"Error getting best candidate: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/chat/interview-questions/{job_title}")
+async def get_interview_questions(
+    job_title: str,
+    current_company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db)
+):
+    """Get interview questions for a specific job"""
+    try:
+        # Configure Gemini with hardcoded API key
+        hr_assistant.configure_gemini("AIzaSyDN_lLLx9scBj1ZRo9QaNDgwCTl6tr-Kss")
+        
+        # Ensure HR assistant is initialized
+        if not hasattr(hr_assistant, 'db_session') or hr_assistant.db_session is None:
+            hr_assistant.initialize_company_data(str(current_company.id), db)
+        
+        # Find the job
+        job = hr_assistant._find_relevant_job(job_title)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        questions = hr_assistant.generate_interview_questions(job)
+        return {"questions": questions}
+    except Exception as e:
+        logger.error(f"Error getting interview questions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     uvicorn.run(

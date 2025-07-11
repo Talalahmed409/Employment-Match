@@ -57,7 +57,7 @@ def verify_google_token(token: str) -> Dict[str, Any]:
     except Exception as e:
         raise GoogleAuthError(f"Token verification failed: {str(e)}")
 
-def get_or_create_google_user(db: Session, google_user_info: Dict[str, Any], user_type: str) -> Union[Company, Candidate]:
+def get_or_create_google_user(db: Session, google_user_info: Dict[str, Any], user_type: str) -> tuple[Union[Company, Candidate], bool]:
     """
     Get existing user or create new user from Google OAuth data
     
@@ -67,7 +67,7 @@ def get_or_create_google_user(db: Session, google_user_info: Dict[str, Any], use
         user_type: Either 'company' or 'candidate'
         
     Returns:
-        Company or Candidate object
+        Tuple of (Company or Candidate object, is_new_user boolean)
     """
     email = google_user_info.get('email')
     if not email:
@@ -77,7 +77,7 @@ def get_or_create_google_user(db: Session, google_user_info: Dict[str, Any], use
     if user_type == "company":
         user = db.query(Company).filter(Company.email == email).first()
         if user:
-            return user
+            return user, False
         
         # Create new company user
         company = Company(
@@ -85,17 +85,18 @@ def get_or_create_google_user(db: Session, google_user_info: Dict[str, Any], use
             email=email,
             password_hash=get_password_hash("google_oauth_user"),  # Placeholder password
             google_id=google_user_info.get('sub'),  # Google user ID
-            is_google_user=True
+            is_google_user=True,
+            profile_complete=False  # New Google OAuth users need to complete profile
         )
         db.add(company)
         db.commit()
         db.refresh(company)
-        return company
+        return company, True
         
     elif user_type == "candidate":
         user = db.query(Candidate).filter(Candidate.email == email).first()
         if user:
-            return user
+            return user, False
         
         # Parse name from Google data
         name_parts = google_user_info.get('name', 'Unknown User').split(' ', 1)
@@ -109,17 +110,18 @@ def get_or_create_google_user(db: Session, google_user_info: Dict[str, Any], use
             email=email,
             password_hash=get_password_hash("google_oauth_user"),  # Placeholder password
             google_id=google_user_info.get('sub'),  # Google user ID
-            is_google_user=True
+            is_google_user=True,
+            profile_complete=False  # New Google OAuth users need to complete profile
         )
         db.add(candidate)
         db.commit()
         db.refresh(candidate)
-        return candidate
+        return candidate, True
     
     else:
         raise ValueError("Invalid user_type. Must be 'company' or 'candidate'")
 
-def authenticate_google_user(db: Session, token: str, user_type: str) -> Union[Company, Candidate]:
+def authenticate_google_user(db: Session, token: str, user_type: str) -> tuple[Union[Company, Candidate], bool]:
     """
     Authenticate user with Google OAuth token
     
@@ -129,7 +131,7 @@ def authenticate_google_user(db: Session, token: str, user_type: str) -> Union[C
         user_type: Either 'company' or 'candidate'
         
     Returns:
-        Company or Candidate object
+        Tuple of (Company or Candidate object, is_new_user boolean)
         
     Raises:
         HTTPException: If authentication fails
@@ -139,9 +141,9 @@ def authenticate_google_user(db: Session, token: str, user_type: str) -> Union[C
         google_user_info = verify_google_token(token)
         
         # Get or create user
-        user = get_or_create_google_user(db, google_user_info, user_type)
+        user, is_new_user = get_or_create_google_user(db, google_user_info, user_type)
         
-        return user
+        return user, is_new_user
         
     except GoogleAuthError as e:
         raise HTTPException(

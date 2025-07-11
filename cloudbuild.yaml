@@ -41,5 +41,5 @@ images:
 substitutions:
   _DATABASE_URL: "postgresql://neondb_owner:npg_ZoB1Unqpc3rJ@ep-red-salad-a20vuj1d.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
   _SECRET_KEY: "OwCZ_QC5xaHZJ6m5B2S6F_WsFydovnXGJxWSt5r120Q"
-  _GEMINI_API_KEY: "AIzaSyCSzIna3eChAypUuPeAJAtWU9YCZE0Nl_8"
+  _GEMINI_API_KEY: "AIzaSyDN_lLLx9scBj1ZRo9QaNDgwCTl6tr-Kss"
   _GOOGLE_CLIENT_ID: "248629291681-ep686slgour47ovifcr6pgvasagi1amb.apps.googleusercontent.com"
