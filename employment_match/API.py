@@ -19,7 +19,7 @@ load_dotenv()
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, EmailStr
 import uvicorn
@@ -40,6 +40,7 @@ from employment_match.auth import (
 )
 from employment_match.google_auth import authenticate_google_user
 from employment_match.hr_assistant import hr_assistant
+from employment_match.cloud_storage import get_storage_manager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -218,6 +219,8 @@ class CompanyProfileResponse(BaseModel):
     website: Optional[str] = Field(None, description="Company website")
     location: Optional[str] = Field(None, description="Company location")
     industry: Optional[str] = Field(None, description="Company industry")
+    profile_picture_path: Optional[str] = Field(None, description="Path to profile picture")
+    background_picture_path: Optional[str] = Field(None, description="Path to background picture")
     created_at: datetime = Field(..., description="Account creation date")
 
 class CandidateProfileResponse(BaseModel):
@@ -231,6 +234,8 @@ class CandidateProfileResponse(BaseModel):
     years_experience: Optional[int] = Field(None, description="Years of experience")
     cv_file_path: Optional[str] = Field(None, description="Path to uploaded CV file")
     extracted_skills: Optional[Dict[str, Any]] = Field(None, description="Extracted skills from CV")
+    profile_picture_path: Optional[str] = Field(None, description="Path to profile picture")
+    background_picture_path: Optional[str] = Field(None, description="Path to background picture")
     created_at: datetime = Field(..., description="Account creation date")
 
 # Global variables for loaded models and data
@@ -447,7 +452,7 @@ async def google_auth(auth_data: GoogleAuthRequest, db: Session = Depends(get_db
         token_type="bearer",
         user_type=auth_data.user_type,
         user_id=int(str(user.id)),
-        profile_complete=user.profile_complete,
+        profile_complete=bool(user.profile_complete),
         is_new_user=is_new_user
     )
 
@@ -466,6 +471,8 @@ async def get_company_profile(
         website=str(current_company.website) if current_company.website is not None else None,
         location=str(current_company.location) if current_company.location is not None else None,
         industry=str(current_company.industry) if current_company.industry is not None else None,
+        profile_picture_path=str(current_company.profile_picture_path) if current_company.profile_picture_path is not None else None,
+        background_picture_path=str(current_company.background_picture_path) if current_company.background_picture_path is not None else None,
         created_at=current_company.created_at
     )
 
@@ -503,6 +510,8 @@ async def update_company_profile(
         website=str(current_company.website) if current_company.website is not None else None,
         location=str(current_company.location) if current_company.location is not None else None,
         industry=str(current_company.industry) if current_company.industry is not None else None,
+        profile_picture_path=str(current_company.profile_picture_path) if current_company.profile_picture_path is not None else None,
+        background_picture_path=str(current_company.background_picture_path) if current_company.background_picture_path is not None else None,
         created_at=current_company.created_at
     )
 
@@ -523,6 +532,8 @@ async def get_candidate_profile(
         years_experience=int(str(current_candidate.years_experience)) if current_candidate.years_experience is not None else None,
         cv_file_path=str(current_candidate.cv_file_path) if current_candidate.cv_file_path is not None else None,
         extracted_skills=current_candidate.extracted_skills,
+        profile_picture_path=str(current_candidate.profile_picture_path) if current_candidate.profile_picture_path is not None else None,
+        background_picture_path=str(current_candidate.background_picture_path) if current_candidate.background_picture_path is not None else None,
         created_at=current_candidate.created_at
     )
 
@@ -565,6 +576,8 @@ async def update_candidate_profile(
         years_experience=int(str(current_candidate.years_experience)) if current_candidate.years_experience is not None else None,
         cv_file_path=str(current_candidate.cv_file_path) if current_candidate.cv_file_path is not None else None,
         extracted_skills=current_candidate.extracted_skills,
+        profile_picture_path=str(current_candidate.profile_picture_path) if current_candidate.profile_picture_path is not None else None,
+        background_picture_path=str(current_candidate.background_picture_path) if current_candidate.background_picture_path is not None else None,
         created_at=current_candidate.created_at
     )
 
@@ -583,6 +596,8 @@ async def get_my_profile(
             website=str(current_user.website) if current_user.website is not None else None,
             location=str(current_user.location) if current_user.location is not None else None,
             industry=str(current_user.industry) if current_user.industry is not None else None,
+            profile_picture_path=str(current_user.profile_picture_path) if current_user.profile_picture_path is not None else None,
+            background_picture_path=str(current_user.background_picture_path) if current_user.background_picture_path is not None else None,
             created_at=current_user.created_at
         )
     else:  # Candidate
@@ -597,7 +612,141 @@ async def get_my_profile(
             years_experience=int(str(current_user.years_experience)) if current_user.years_experience is not None else None,
             cv_file_path=str(current_user.cv_file_path) if current_user.cv_file_path is not None else None,
             extracted_skills=current_user.extracted_skills,
+            profile_picture_path=str(current_user.profile_picture_path) if current_user.profile_picture_path is not None else None,
+            background_picture_path=str(current_user.background_picture_path) if current_user.background_picture_path is not None else None,
             created_at=current_user.created_at
+        )
+
+@app.post("/profile/upload-pictures")
+async def upload_profile_pictures(
+    profile_picture: UploadFile = File(None),
+    background_picture: UploadFile = File(None),
+    current_user: Union[Company, Candidate] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Upload profile and/or background picture for the authenticated user (candidate or company)"""
+    user_type = 'candidate' if hasattr(current_user, 'cv_file_path') else 'company'
+    storage_manager = get_storage_manager()
+    updated = False
+
+    if profile_picture is not None:
+        ext = os.path.splitext(profile_picture.filename)[1]
+        file_path = f"{user_type}_pictures/{current_user.id}/profile{ext}"
+        uploaded_path = storage_manager.upload_file(profile_picture.file, file_path, profile_picture.content_type)
+        if uploaded_path:
+            current_user.profile_picture_path = uploaded_path
+            updated = True
+
+    if background_picture is not None:
+        ext = os.path.splitext(background_picture.filename)[1]
+        file_path = f"{user_type}_pictures/{current_user.id}/background{ext}"
+        uploaded_path = storage_manager.upload_file(background_picture.file, file_path, background_picture.content_type)
+        if uploaded_path:
+            current_user.background_picture_path = uploaded_path
+            updated = True
+
+    if updated:
+        db.commit()
+        db.refresh(current_user)
+
+    # Return updated profile
+    if user_type == 'company':
+        return CompanyProfileResponse(
+            id=int(str(current_user.id)),
+            name=str(current_user.name),
+            email=str(current_user.email),
+            description=str(current_user.description) if current_user.description is not None else None,
+            website=str(current_user.website) if current_user.website is not None else None,
+            location=str(current_user.location) if current_user.location is not None else None,
+            industry=str(current_user.industry) if current_user.industry is not None else None,
+            profile_picture_path=str(current_user.profile_picture_path) if current_user.profile_picture_path is not None else None,
+            background_picture_path=str(current_user.background_picture_path) if current_user.background_picture_path is not None else None,
+            created_at=current_user.created_at
+        )
+    else:
+        return CandidateProfileResponse(
+            id=int(str(current_user.id)),
+            first_name=str(current_user.first_name),
+            last_name=str(current_user.last_name),
+            email=str(current_user.email),
+            phone=str(current_user.phone) if current_user.phone is not None else None,
+            location=str(current_user.location) if current_user.location is not None else None,
+            current_title=str(current_user.current_title) if current_user.current_title is not None else None,
+            years_experience=int(str(current_user.years_experience)) if current_user.years_experience is not None else None,
+            cv_file_path=str(current_user.cv_file_path) if current_user.cv_file_path is not None else None,
+            extracted_skills=current_user.extracted_skills,
+            profile_picture_path=str(current_user.profile_picture_path) if current_user.profile_picture_path is not None else None,
+            background_picture_path=str(current_user.background_picture_path) if current_user.background_picture_path is not None else None,
+            created_at=current_user.created_at
+        )
+
+
+
+@app.get("/profile/picture/{user_type}/{user_id}/{picture_type}")
+async def get_profile_picture(
+    user_type: str,
+    user_id: int,
+    picture_type: str,
+    db: Session = Depends(get_db)
+):
+    """Get profile or background picture for a user (public access)"""
+    # Validate picture type
+    if picture_type not in ["profile", "background"]:
+        raise HTTPException(status_code=400, detail="Invalid picture type. Must be 'profile' or 'background'")
+    
+    # Validate user type
+    if user_type not in ["candidate", "company"]:
+        raise HTTPException(status_code=400, detail="Invalid user type. Must be 'candidate' or 'company'")
+    
+    # Get the user from database
+    if user_type == "candidate":
+        user = db.query(Candidate).filter(Candidate.id == user_id).first()
+    else:
+        user = db.query(Company).filter(Company.id == user_id).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get the picture path and convert to string
+    if picture_type == "profile":
+        picture_path = str(user.profile_picture_path) if user.profile_picture_path is not None else None
+    else:
+        picture_path = str(user.background_picture_path) if user.background_picture_path is not None else None
+    
+    if not picture_path:
+        raise HTTPException(status_code=404, detail=f"{picture_type.capitalize()} picture not found")
+    
+    storage_manager = get_storage_manager()
+    
+    # Check if it's a cloud storage path
+    if picture_path.startswith("gs://"):
+        # Generate signed URL for cloud storage
+        file_path = picture_path.replace(f"gs://{storage_manager.bucket_name}/", "")
+        
+        # Try public URL first (more reliable)
+        download_url = storage_manager.get_public_url(file_path)
+        
+        if not download_url:
+            # Fallback to signed URL
+            download_url = storage_manager.get_download_url(file_path)
+        
+        if download_url:
+            # Return the URL directly instead of redirecting
+            return {"image_url": download_url}
+        else:
+            logger.error(f"Failed to get download URL for picture: {file_path}")
+            raise HTTPException(status_code=404, detail="Picture not found in cloud storage")
+    else:
+        # Local file - the path stored in database is already the full path
+        if not os.path.exists(picture_path):
+            logger.error(f"Local picture file not found: {picture_path}")
+            raise HTTPException(status_code=404, detail="Picture file not found")
+        
+        filename = os.path.basename(picture_path)
+        return FileResponse(
+            path=picture_path,
+            filename=filename,
+            media_type="image/*"
         )
 
 # Job posting endpoints
@@ -935,23 +1084,41 @@ async def upload_cv(
     if not esco_skills or not embedder:
         raise HTTPException(status_code=500, detail="Models not properly loaded")
     
-    # Save uploaded file
-    upload_dir = Path("uploads/cvs")
-    upload_dir.mkdir(parents=True, exist_ok=True)
+    # Generate file path
+    file_path = f"cvs/cv_{current_candidate.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     
-    file_path = upload_dir / f"cv_{current_candidate.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-    
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
+    # Upload to cloud storage
+    storage_manager = get_storage_manager()
     try:
-        # Extract skills from CV
-        skills = extract_cv_skills(str(file_path), esco_skills, embedder)
+        uploaded_path = storage_manager.upload_file(file.file, file_path, "application/pdf")
+    except RuntimeError as e:
+        logger.error(f"Failed to upload CV to GCS: {e}")
+        raise HTTPException(status_code=500, detail="Failed to upload CV file to cloud storage. Please check your configuration.")
+    
+    logger.info(f"CV uploaded to: {uploaded_path}. Starting skill extraction for candidate {current_candidate.id}.")
+
+    try:
+        # For skill extraction, we need a local file
+        # Since we're now GCS-only, always download temporarily for processing
+        temp_file = storage_manager.download_file(file_path)
+        if not temp_file:
+            raise HTTPException(status_code=500, detail="Failed to process CV file")
+        
+        skills = extract_cv_skills(temp_file.name, esco_skills, embedder)
+        temp_file.close()
+        os.unlink(temp_file.name)
         
         # Update candidate's CV information
-        current_candidate.cv_file_path = str(file_path)
+        logger.info(f"Skill extraction complete. Assigning CV path to candidate {current_candidate.id}. Path: {uploaded_path}")
+        current_candidate.cv_file_path = uploaded_path
         current_candidate.extracted_skills = skills
+        
+        logger.info(f"Attempting to commit database changes for candidate {current_candidate.id}...")
         db.commit()
+        logger.info(f"Database commit successful for candidate {current_candidate.id}.")
+        
+        db.refresh(current_candidate)
+        logger.info(f"After refresh, CV path for candidate {current_candidate.id} is: {current_candidate.cv_file_path}")
         
         return {
             "message": "CV uploaded and processed successfully",
@@ -960,10 +1127,13 @@ async def upload_cv(
         
     except Exception as e:
         # Clean up file on error
-        if file_path.exists():
-            file_path.unlink()
-        logger.error(f"Error processing CV: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        try:
+            storage_manager.delete_file(file_path)
+        except Exception as cleanup_error:
+            logger.error(f"Failed to cleanup file after error: {cleanup_error}")
+        
+        logger.error(f"Error during CV processing or DB update for candidate {current_candidate.id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"An error occurred during CV processing: {e}")
 
 # Keep existing skill extraction endpoints for backward compatibility
 @app.post("/extract-job-skills", response_model=SkillsResponse)
@@ -1284,6 +1454,88 @@ async def get_interview_questions(
     except Exception as e:
         logger.error(f"Error getting interview questions: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/download-cv")
+async def download_cv(current_candidate: Candidate = Depends(get_current_candidate)):
+    """Allow the candidate to download their uploaded CV PDF file"""
+    # Get the actual value from the SQLAlchemy model
+    cv_file_path = str(current_candidate.cv_file_path) if current_candidate.cv_file_path is not None else None
+    
+    # Debug logging
+    logger.info(f"Download CV request for candidate {current_candidate.id}")
+    logger.info(f"Raw cv_file_path: {current_candidate.cv_file_path}")
+    logger.info(f"Processed cv_file_path: {cv_file_path}")
+    
+    if not cv_file_path:
+        raise HTTPException(status_code=404, detail="CV file not found")
+    
+    storage_manager = get_storage_manager()
+    
+    # Check if it's a cloud storage path
+    if cv_file_path.startswith("gs://"):
+        # Generate signed URL for cloud storage
+        file_path = cv_file_path.replace(f"gs://{storage_manager.bucket_name}/", "")
+        
+        logger.info(f"Attempting to get download URL for: {file_path}")
+        
+        # Try public URL first (more reliable)
+        download_url = storage_manager.get_public_url(file_path)
+        
+        if not download_url:
+            # Fallback to signed URL
+            download_url = storage_manager.get_download_url(file_path)
+        
+        if download_url:
+            # Return the URL directly instead of redirecting
+            return {"download_url": download_url}
+        else:
+            logger.error(f"Failed to get download URL. Bucket: {storage_manager.bucket_name}, Path: {file_path}")
+            raise HTTPException(status_code=404, detail="CV file not found in cloud storage")
+    else:
+        # Local file - the path stored in database is already the full path
+        logger.info(f"Checking local file path: {cv_file_path}")
+        
+        if not os.path.exists(cv_file_path):
+            logger.error(f"Local file not found: {cv_file_path}")
+            raise HTTPException(status_code=404, detail="CV file not found")
+        
+        filename = os.path.basename(cv_file_path)
+        return FileResponse(
+            path=cv_file_path,
+            filename=filename,
+            media_type="application/pdf"
+        )
+
+@app.get("/test-storage")
+async def test_storage():
+    """Test storage connectivity and permissions"""
+    storage_manager = get_storage_manager()
+    
+    try:
+        # Test if we can access the bucket
+        if not storage_manager.bucket:
+            return {"error": "Storage not initialized", "bucket_name": storage_manager.bucket_name}
+        
+        # Test if bucket exists
+        bucket_exists = storage_manager.bucket.exists()
+        
+        # Test if we can list files
+        blobs = list(storage_manager.bucket.list_blobs(max_results=1))
+        can_list = len(blobs) >= 0
+        
+        # Test public URL generation
+        test_file = "test.txt"
+        public_url = storage_manager.get_public_url(test_file)
+        
+        return {
+            "bucket_name": storage_manager.bucket_name,
+            "bucket_exists": bucket_exists,
+            "can_list_files": can_list,
+            "public_url_test": public_url is not None,
+            "test_public_url": public_url
+        }
+    except Exception as e:
+        return {"error": str(e), "bucket_name": storage_manager.bucket_name}
 
 if __name__ == "__main__":
     uvicorn.run(

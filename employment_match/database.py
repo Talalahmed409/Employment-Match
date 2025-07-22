@@ -33,6 +33,8 @@ class Company(Base):
     website = Column(String(255), nullable=True)
     location = Column(String(255), nullable=True)
     industry = Column(String(255), nullable=True)
+    profile_picture_path = Column(String(500), nullable=True)  # Path to profile picture
+    background_picture_path = Column(String(500), nullable=True)  # Path to background picture
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     is_active = Column(Boolean, default=True)
@@ -59,6 +61,8 @@ class Candidate(Base):
     cv_file_path = Column(String(500), nullable=True)
     cv_text = Column(Text, nullable=True)
     extracted_skills = Column(JSON, nullable=True)  # Store standardized skills
+    profile_picture_path = Column(String(500), nullable=True)  # Path to profile picture
+    background_picture_path = Column(String(500), nullable=True)  # Path to background picture
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     is_active = Column(Boolean, default=True)
