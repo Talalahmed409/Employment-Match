@@ -13,12 +13,18 @@ from sqlalchemy.sql import func
 
 # Database configuration
 DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL environment variable is required")
 
-# Create engine and session
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Create engine and session lazily so Alembic can fall back to alembic.ini
+engine = create_engine(DATABASE_URL) if DATABASE_URL else None
+SessionLocal = (
+    sessionmaker(autocommit=False, autoflush=False, bind=engine) if engine else None
+)
+
+def require_database_url() -> str:
+    """Return DATABASE_URL or raise a helpful error when missing."""
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL environment variable is required")
+    return DATABASE_URL
 
 # Base class for models
 Base = declarative_base()

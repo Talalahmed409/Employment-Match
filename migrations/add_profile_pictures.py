@@ -6,13 +6,13 @@ Migration script to add profile_picture_path and background_picture_path fields 
 from sqlalchemy import create_engine, text
 import os
 
-# Database configuration - must be supplied via environment
+# Database configuration - must be supplied via environment when running script
 DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL environment variable is required")
 
 def add_profile_pictures():
     """Add profile_picture_path and background_picture_path fields to existing tables"""
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL environment variable is required")
     print(f"🔧 Connecting to database: {DATABASE_URL.split('@')[1] if '@' in DATABASE_URL else 'Unknown'}")
     
     engine = create_engine(DATABASE_URL)
