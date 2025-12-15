@@ -6,8 +6,10 @@ Migration script to add profile_complete field to Company and Candidate tables
 from sqlalchemy import create_engine, text
 import os
 
-# Database configuration - use Neon database URL from environment
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://neondb_owner:npg_ZoB1Unqpc3rJ@ep-red-salad-a20vuj1d.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require")
+# Database configuration - must be supplied via environment
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL environment variable is required")
 
 def add_profile_complete_field():
     """Add profile_complete field to existing tables"""

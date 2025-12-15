@@ -12,7 +12,9 @@ from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.sql import func
 
 # Database configuration
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://employment_user:password123@localhost:5432/employment_match")
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL environment variable is required")
 
 # Create engine and session
 engine = create_engine(DATABASE_URL)

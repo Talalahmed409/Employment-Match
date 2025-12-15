@@ -73,7 +73,7 @@ Create a `.env` file for your Cloud Run deployment:
 
 ```env
 # Database
-DATABASE_URL="postgresql://neondb_owner:npg_ZoB1Unqpc3rJ@ep-red-salad-a20vuj1d.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+DATABASE_URL="postgresql://user:password@host:5432/database"
 
 # JWT Secret
 SECRET_KEY="your-super-secret-key-change-in-production"

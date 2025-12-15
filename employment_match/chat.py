@@ -82,7 +82,10 @@ class EnhancedHRAssistant:
         
     def configure_gemini(self):
         try:
-            gemini_api_key = "AIzaSyDN_lLLx9scBj1ZRo9QaNDgwCTl6tr-Kss"
+            gemini_api_key = os.getenv("GEMINI_API_KEY")
+            if not gemini_api_key:
+                raise RuntimeError("GEMINI_API_KEY is not set")
+
             genai.configure(api_key=gemini_api_key)
             self.model = genai.GenerativeModel('models/gemini-2.5-pro')
             test_response = self.model.generate_content("Test connection")
