@@ -39,3 +39,5 @@ data/*.pdf
 
 data/cv_skills.json
 data/job_skills.json
+
+employment-match-key.json
